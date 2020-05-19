@@ -11,16 +11,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
- 
+
 using System;
 using UnityEngine;
 
 public class PitchModifier : MonoBehaviour
 {
+    #region Pitch Change Parameters
     public int BinSize { get; set; }
     public float [] InputSamples { get; set; }
     public float PercentChange { get; set; }
     public int ProcessedLength { get; private set; }
+    #endregion
 
     private float[,] bins;
     private int binSampleOffset = 2048;
@@ -28,7 +30,7 @@ public class PitchModifier : MonoBehaviour
     private int rampSampleCount = 1024;
     private int numberOfBins;
 
-    public PitchModifier(float[] inputSamples, int binSize)
+    virtual public PitchModifier(float[] inputSamples, int binSize)
     {
         InputSamples = new float[inputSamples.Length];
         Array.Copy(inputSamples, InputSamples, inputSamples.Length);
@@ -36,7 +38,7 @@ public class PitchModifier : MonoBehaviour
         BinSize = binSize;
     }
 
-    public void FillBins()
+    virtual public void FillBins()
     {
         numberOfBins = (int) Math.Ceiling((float)InputSamples.Length / (float)binSampleOffset);
         bins = new float[numberOfBins,BinSize];
@@ -52,17 +54,17 @@ public class PitchModifier : MonoBehaviour
         }
     }
 
-    int GetP1(int i)
+    protected int GetP1(int i)
     {
         return (int)((i / binSampleOffset) + 1);
     }
 
-    int GetP2(int i)
+    protected int GetP2(int i)
     {
         return (GetP1(i) - 1);
     }
 
-    void ProcessBins()
+    protected void ProcessBins()
     {
         var mySwitchPoint = GetSwitchSample();
         processedSamples = new float[ProcessedLength];
@@ -89,24 +91,24 @@ public class PitchModifier : MonoBehaviour
         }
     }
 
-    int GetSwitchSample()
+    protected int GetSwitchSample()
     {
         return (int) Math.Ceiling( ( ((float) BinSize) * PercentChange ) / 2);
     }
 
-    void SetLength()
+    protected void SetLength()
     {
         ProcessedLength = (int) Math.Ceiling( ((float) InputSamples.Length) * PercentChange);
 
     }
 
-    public void SetPercentChange(float percentChange)
+    virtual public void SetPercentChange(float percentChange)
     {
         PercentChange = percentChange;
         SetLength();
     }
     
-    public void GetUnModifiedAudio(float[] targetSamples)
+    virtual public void GetUnModifiedAudio(float[] targetSamples)
     {
         FillBins();
         for (var i = 0; i < InputSamples.Length; ++i)
@@ -116,7 +118,7 @@ public class PitchModifier : MonoBehaviour
         }
     }
 
-    public void GetModifiedAudio(float[] targetSamples)
+    virtual public void GetModifiedAudio(float[] targetSamples)
     {
         FillBins();
         ProcessBins();
