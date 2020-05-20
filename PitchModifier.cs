@@ -19,11 +19,11 @@ public class PitchModifier : MonoBehaviour
 {
     #region Pitch Change Parameters
     public int BinSize { get; set; }
-    public float [] InputSamples { get; set; }
     public float PercentChange { get; set; }
     public int ProcessedLength { get; private set; }
     #endregion
 
+    protected float [] InputSamples { get; set; }
     private float[,] bins;
     private int binSampleOffset = 2048;
     private float[] processedSamples;
