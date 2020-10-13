@@ -15,10 +15,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //This class creates time stretched audio without altering the pitch. 
 public class ConstantPitchTimeScale : MonoBehaviour
 {
-    #region Pitch Change Parameters
-    public static float PercentChange { get; set; }
-    public static int BlendedLength { get; private set; }
-    #endregion
+    public static float ChangeFactor { get; set; }
+    public static int ScaledLength { get; private set; }
 
     float[,] _bins;
     float[] _inputSamples;
@@ -28,20 +26,38 @@ public class ConstantPitchTimeScale : MonoBehaviour
     int _numberOfBins;
     int _rampLength;
 
-    public void Create(float[] inputSamples, int binSize = 4096, float rampProportion = 0.25f)
+    public void Create(float[] inputSamples, float changeFactor = 1f, int binSize = 4096, float rampProportion = 0.25f)
     {
+        if (binSize > inputSamples.Length)
+            throw new ArgumentOutOfRangeException($"binSize must be less than {inputSamples.Length}");
+
+        if (rampProportion > 1f || rampProportion < 0f)
+            throw new ArgumentOutOfRangeException("rampProportion must be between 0 and 1");
+
+        if (inputSamples == null)
+            throw new ArgumentException("inputSamples cannot be null");
+
         _inputSamples = new float[inputSamples.Length];
         _rampLength = (int)((float)binSize * rampProportion);
         _halfBinLength = binSize / 2;
         _binLength = binSize;
         _numberOfBins = (int)Math.Ceiling((float)_inputSamples.Length / (float)_halfBinLength);
         inputSamples.CopyTo(_inputSamples, 0);
+
+        if (changeFactor != 1f)
+            SetChangeFactor(changeFactor);
     }
 
-    public void SetPercentChange(float percentChange)
+    public void SetChangeFactor(float changeFactor)
     {
-        PercentChange = percentChange;
-        BlendedLength = (int)Math.Ceiling((float)_inputSamples.Length * PercentChange);
+        if (changeFactor >= 2f)
+            throw new ArgumentOutOfRangeException("changeFactor must be less than 2");
+
+        if (changeFactor <= .7f)
+            throw new ArgumentOutOfRangeException("changeFactor must be greater than .7");
+
+        ChangeFactor = changeFactor;
+        ScaledLength = (int)Math.Ceiling((float)_inputSamples.Length * changeFactor);
     }
 
     public void GetModifiedAudio(out float[] targetSamples)
@@ -55,27 +71,27 @@ public class ConstantPitchTimeScale : MonoBehaviour
     void InitializeBins()
     {
         _bins = new float[_numberOfBins, _binLength];
-        for (var i = 0; i < _inputSamples.Length; ++i)
+        for (var positionInInputSamples = 0; positionInInputSamples < _inputSamples.Length; ++positionInInputSamples)
         {
-            _bins[LeftHalfBinNumber(i) - 1, i % _halfBinLength] = _inputSamples[i];
-            if (RightHalfBinNumber(i) > 0)
-                _bins[RightHalfBinNumber(i) - 1, (i % _halfBinLength) + _halfBinLength] = _inputSamples[i];
+            _bins[LeftHalfBinNumber(positionInInputSamples) - 1, positionInInputSamples % _halfBinLength] = _inputSamples[positionInInputSamples];
+            if (RightHalfBinNumber(positionInInputSamples) > 0)
+                _bins[RightHalfBinNumber(positionInInputSamples) - 1, (positionInInputSamples % _halfBinLength) + _halfBinLength] = _inputSamples[positionInInputSamples];
         }
     }
 
-    int LeftHalfBinNumber(int i) => (int)((i / _halfBinLength) + 1);
-    int RightHalfBinNumber(int i) => LeftHalfBinNumber(i) - 1;
+    int LeftHalfBinNumber(int positionInInputSamples) => (int)((positionInInputSamples / _halfBinLength) + 1);
+    int RightHalfBinNumber(int positionInInputSamples) => LeftHalfBinNumber(positionInInputSamples) - 1;
 
     void BlendBins()
     {
-        int halfOfWindowLength = (int)Math.Ceiling((float)_binLength * PercentChange / 2f);
-        _blendedSamples = new float[BlendedLength];
+        int halfOfWindowLength = (int)Math.Ceiling((float)_binLength * ChangeFactor / 2f);
+        _blendedSamples = new float[ScaledLength];
         var positionInWindow = 0;
-        for (var positionInBlendedSamples = 0; positionInBlendedSamples < BlendedLength; ++positionInBlendedSamples)
+        for (var positionInBlendedSamples = 0; positionInBlendedSamples < ScaledLength; ++positionInBlendedSamples)
         {
             bool isWithinRamp = ((int)((positionInBlendedSamples - _rampLength) / halfOfWindowLength) != (int)(positionInBlendedSamples / halfOfWindowLength)) && positionInBlendedSamples > _rampLength;
-            bool isLastWindow = (positionInBlendedSamples / halfOfWindowLength) + 1 == _numberOfBins;
-            if (isWithinRamp && !isLastWindow)
+            bool isWithinLastBin = (positionInBlendedSamples / halfOfWindowLength) + 1 == _numberOfBins;
+            if (isWithinRamp && !isWithinLastBin)
             {
                 float rightScaleAmount = (float)positionInWindow / (float)_rampLength;
                 float leftScaleAmount = (float)(1 - rightScaleAmount);
