@@ -26,10 +26,10 @@ public class ConstantPitchTimeScale : MonoBehaviour
     int _numberOfBins;
     int _rampLength;
 
-    public void Create(float[] inputSamples, float changeFactor = 1f, int binSize = 4096, float rampProportion = 0.25f)
+    public void Create(float[] inputSamples, float changeFactor = 1f, int binLength = 4096, float rampProportion = 0.25f)
     {
-        if (binSize > inputSamples.Length)
-            throw new ArgumentOutOfRangeException($"binSize must be less than {inputSamples.Length}");
+        if (binLength > inputSamples.Length)
+            throw new ArgumentOutOfRangeException($"binLength: {binLength} must be less than inputSample.Length: {inputSamples.Length}");
 
         if (rampProportion > 1f || rampProportion < 0f)
             throw new ArgumentOutOfRangeException("rampProportion must be between 0 and 1");
@@ -38,9 +38,9 @@ public class ConstantPitchTimeScale : MonoBehaviour
             throw new ArgumentException("inputSamples cannot be null");
 
         _inputSamples = new float[inputSamples.Length];
-        _rampLength = (int)((float)binSize * rampProportion);
-        _halfBinLength = binSize / 2;
-        _binLength = binSize;
+        _rampLength = (int)((float)binLength * rampProportion);
+        _halfBinLength = binLength / 2;
+        _binLength = binLength;
         _numberOfBins = (int)Math.Ceiling((float)_inputSamples.Length / (float)_halfBinLength);
         inputSamples.CopyTo(_inputSamples, 0);
 
@@ -50,11 +50,8 @@ public class ConstantPitchTimeScale : MonoBehaviour
 
     public void SetChangeFactor(float changeFactor)
     {
-        if (changeFactor >= 2f)
-            throw new ArgumentOutOfRangeException("changeFactor must be less than 2");
-
-        if (changeFactor <= .7f)
-            throw new ArgumentOutOfRangeException("changeFactor must be greater than .7");
+        if (changeFactor >= 1.5f)
+            throw new ArgumentOutOfRangeException("changeFactor must be less than 1.5");
 
         ChangeFactor = changeFactor;
         ScaledLength = (int)Math.Ceiling((float)_inputSamples.Length * changeFactor);
@@ -84,10 +81,10 @@ public class ConstantPitchTimeScale : MonoBehaviour
 
     void BlendBins()
     {
-        int halfOfWindowLength = (int)Math.Ceiling((float)_binLength * ChangeFactor / 2f);
+        int halfOfWindowLength = (int)Math.Ceiling((float)_halfBinLength * ChangeFactor);
         _blendedSamples = new float[ScaledLength];
         var positionInWindow = 0;
-        for (var positionInBlendedSamples = 0; positionInBlendedSamples < ScaledLength; ++positionInBlendedSamples)
+        for (var positionInBlendedSamples = 0; positionInBlendedSamples < _blendedSamples.Length; ++positionInBlendedSamples)
         {
             bool isWithinRamp = ((int)((positionInBlendedSamples - _rampLength) / halfOfWindowLength) != (int)(positionInBlendedSamples / halfOfWindowLength)) && positionInBlendedSamples > _rampLength;
             bool isWithinLastBin = (positionInBlendedSamples / halfOfWindowLength) + 1 == _numberOfBins;
@@ -96,7 +93,7 @@ public class ConstantPitchTimeScale : MonoBehaviour
                 float rightScaleAmount = (float)positionInWindow / (float)_rampLength;
                 float leftScaleAmount = (float)(1 - rightScaleAmount);
                 float rightSampleValue = _bins[(positionInBlendedSamples / halfOfWindowLength), positionInBlendedSamples % halfOfWindowLength];
-                float leftSampleValue = _bins[positionInBlendedSamples / halfOfWindowLength - 1, (positionInBlendedSamples % halfOfWindowLength) + halfOfWindowLength];
+                float leftSampleValue = _bins[(positionInBlendedSamples / halfOfWindowLength) - 1, (positionInBlendedSamples % halfOfWindowLength) + halfOfWindowLength];
                 _blendedSamples[positionInBlendedSamples] = leftSampleValue * leftScaleAmount + rightSampleValue * rightScaleAmount;
                 ++positionInWindow;
             }
